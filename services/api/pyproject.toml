@@ -1,0 +1,21 @@
+[project]
+name = "scoring-api"
+version = "0.1.0"
+description = "API REST du scoring IFRS 9 (FastAPI)."
+requires-python = ">=3.13"
+dependencies = [
+    "scoring-ifrs9",
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.32",
+]
+
+[tool.uv.sources]
+scoring-ifrs9 = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.8,<1.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
