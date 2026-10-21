@@ -88,6 +88,22 @@ docker compose run --rm etl              # pipeline complet (~3-4 min pour 1,35 
 * Dashboard : http://localhost:8501
 * API et sa documentation interactive : http://localhost:8000/docs
 
+## Lancement local sans Docker ni droits administrateur (Windows)
+
+Sur un poste où Docker ne peut pas être installé, `scripts/local_stack.py` installe un
+PostgreSQL portable (binaires officiels EDB) dans `%LOCALAPPDATA%\scoring-postgres`, puis lance
+l'API et le Streamlit en arrière-plan. La connexion est lue dans `SCORING_DATABASE_URL` (`.env`).
+
+```bash
+cp .env.example .env
+uv run python scripts/local_stack.py setup    # 1re fois : Postgres, bases, migrations, pipeline complet
+uv run python scripts/local_stack.py start    # Postgres + API (:8000) + Streamlit (:8501)
+uv run python scripts/local_stack.py stop
+uv run python scripts/local_stack.py status
+```
+
+Les logs de l'API et du Streamlit sont dans `%LOCALAPPDATA%\scoring-postgres\logs\`.
+
 ## Lancement en local (développement)
 
 ```bash
