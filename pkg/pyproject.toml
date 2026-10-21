@@ -1,0 +1,28 @@
+[project]
+name = "scoring-ifrs9"
+version = "0.1.0"
+description = "Logique métier IFRS 9 : ETL, modélisation PD, calcul de l'ECL et accès à la base."
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "pyarrow>=17.0",
+    "scikit-learn>=1.7.2,<2.0.0",
+    "joblib>=1.5.2,<2.0.0",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0.36,<3.0.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "alembic>=1.14,<2.0",
+]
+
+[project.scripts]
+scoring-ifrs9 = "src.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8,<1.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Le package importable est directement pkg/src (import src.etl, src.db, ...)
+module-name = "src"
+module-root = ""

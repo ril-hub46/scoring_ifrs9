@@ -1,16 +1,17 @@
 # Fichier systeme
 Thumbs.db
 
-# Python et poetry
+# Python
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ipynb_checkpoints
 
 # Données
 data/raw/*
-.ipynb_checkpoints
+# Artefacts produits par `scoring-ifrs9 train` (référencés dans mart.model_runs)
+data/models/
 
-
-
-
-
+# Secrets
+.env
