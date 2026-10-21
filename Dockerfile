@@ -1,46 +1,43 @@
-# ÉTAPE 1: Le "Builder" - Installe les dépendances
-FROM python:3.13-slim as builder
+# Une image par service, construites depuis le même Dockerfile (cibles etl, api, web).
+#   docker build --target api -t scoring-api .
 
+# --- Base commune : Python + uv ---
+FROM python:3.13-slim AS base
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /bin/uv
 WORKDIR /app
-
-# Installe Poetry
-RUN pip install poetry
-
-# Copie les fichiers de dépendances
-COPY pyproject.toml poetry.lock ./
-
-# --- CORRECTION ICI ---
-# On force Poetry à créer le dossier .venv DANS /app
-RUN poetry config virtualenvs.in-project true
-
-# Installe les dépendances (SAUF le groupe 'dev')
-# Cela va maintenant créer /app/.venv
-RUN poetry install --no-root --without dev
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/app/.venv PATH="/app/.venv/bin:$PATH"
+# Fichiers du workspace nécessaires à la résolution des dépendances
+COPY pyproject.toml uv.lock .python-version ./
+COPY pkg/pyproject.toml pkg/pyproject.toml
+COPY services/api/pyproject.toml services/api/pyproject.toml
+COPY web/pyproject.toml web/pyproject.toml
 
 
-# ÉTAPE 2: L'image "Finale" - Propre et légère
-# (Renommé 'stage-1' en 'final' pour plus de clarté)
-FROM python:3.13-slim as final
+# --- ETL : package métier + migrations (sert aussi au service "migrate") ---
+FROM base AS etl
+RUN uv sync --frozen --no-dev --package scoring-ifrs9 --no-install-workspace
+COPY pkg pkg
+RUN uv sync --frozen --no-dev --package scoring-ifrs9
+COPY alembic.ini ./
+COPY migrations migrations
+CMD ["scoring-ifrs9", "run-all"]
 
-WORKDIR /app
 
-# Copie l'environnement virtuel installé depuis l'étape "builder"
-# Cette commande va maintenant fonctionner
-COPY --from=builder /app/.venv /app/.venv
+# --- API : FastAPI + package métier ---
+FROM base AS api
+RUN uv sync --frozen --no-dev --package scoring-api --no-install-workspace
+COPY pkg pkg
+COPY services/api services/api
+RUN uv sync --frozen --no-dev --package scoring-api
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-# Active l'environnement virtuel pour toutes les commandes suivantes
-ENV PATH="/app/.venv/bin:$PATH"
 
-# --- MODIFICATIONS POUR STREAMLIT ---
-
-# 1. Copier le script du dashboard
-COPY dashboard.py .
-
-# 2. Copier le modèle (grâce à l'exception du .dockerignore)
-COPY data/processed/scoring_model.pkl data/processed/scoring_model.pkl
-
-# 3. Exposer le port standard de Streamlit
+# --- Web : Streamlit, ne parle qu'à l'API ---
+FROM base AS web
+RUN uv sync --frozen --no-dev --package scoring-web
+COPY web web
 EXPOSE 8501
-
-# 4. Commande de démarrage : Lancer Streamlit
-CMD ["streamlit", "run", "dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "web/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

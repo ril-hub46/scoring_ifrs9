@@ -1,0 +1,14 @@
+[project]
+name = "scoring-web"
+version = "0.1.0"
+description = "Dashboard Streamlit : ne parle qu'à l'API, jamais directement à la base."
+requires-python = ">=3.13"
+dependencies = [
+    "streamlit>=1.51.0,<2.0.0",
+    "httpx>=0.28",
+    "pandas>=2.2",
+    "altair>=5.0",
+]
+
+[tool.uv]
+package = false

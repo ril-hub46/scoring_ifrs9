@@ -1,16 +1,19 @@
 .git/
 .gitignore
-
 .dockerignore
 Dockerfile
+docker-compose.yml
+.env
 
 .venv/
-__pycache__/
+**/__pycache__/
+.pytest_cache/
 
 notebooks/
+**/tests/
+conftest.py
 README.md
+scoring_app.png
 
+# Les données et modèles sont montés en volume au lancement, jamais copiés dans les images
 data/
-src/
-
-!data/processed/scoring_model.pkl

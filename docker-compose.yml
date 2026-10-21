@@ -1,0 +1,66 @@
+# Démarrage : docker compose up -d --build           (db, migrate, api, web)
+# Pipeline  : docker compose run --rm etl             (ingest, staging, train, score)
+#             docker compose run --rm etl scoring-ifrs9 score    (une seule étape)
+
+x-db-url: &db-url
+  SCORING_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-scoring}:${POSTGRES_PASSWORD:-scoring}@db:5432/${POSTGRES_DB:-scoring}
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-scoring}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scoring}
+      POSTGRES_DB: ${POSTGRES_DB:-scoring}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Applique les migrations Alembic puis s'arrête
+  migrate:
+    build: { context: ., target: etl }
+    command: ["alembic", "upgrade", "head"]
+    environment: *db-url
+    depends_on:
+      db: { condition: service_healthy }
+
+  # Job à lancer à la demande (profil "jobs" : pas démarré par `docker compose up`)
+  etl:
+    build: { context: ., target: etl }
+    profiles: ["jobs"]
+    environment: *db-url
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  api:
+    build: { context: ., target: api }
+    restart: unless-stopped
+    environment: *db-url
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/models:/app/data/models:ro
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build: { context: ., target: web }
+    restart: unless-stopped
+    environment:
+      SCORING_API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
